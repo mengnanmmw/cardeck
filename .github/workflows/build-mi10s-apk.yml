@@ -32,7 +32,7 @@ jobs:
               content = f.read_text(encoding="utf-8")
               orig = content
 
-              # 2. 大众车机 (VW/866/869/Desay/Preh/AQ CAR) 首选 20B MFi 挑战（复用原接收者变量名）
+              # 2. 大众车机 (VW/866/869/Desay/Preh/AQ CAR) 首选 20B MFi 挑战
               if "0xaa02" in content.lower() or "MfiLengthMemory" in content or "challenge" in content:
                   if "audi" in content.lower() and "desay" not in content.lower():
                       content = re.sub(
@@ -80,15 +80,13 @@ jobs:
 
       - name: Generate signing keystore
         run: |
-          if [ ! -f keystore.properties ]; then
-            keytool -genkeypair -v \
-              -keystore cardeck-mi10s.jks \
-              -alias cardeck \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass cardeck123 -keypass cardeck123 \
-              -dname "CN=CarDeck Mi10S VW, OU=Dev, O=CarDeck, L=CN, ST=CN, C=CN"
-            printf "storeFile=../cardeck-mi10s.jks\nstorePassword=cardeck123\nkeyAlias=cardeck\nkeyPassword=cardeck123\n" > keystore.properties
-          fi
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/cardeck-mi10s.jks" \
+            -alias cardeck \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass cardeck123 -keypass cardeck123 \
+            -dname "CN=CarDeck Mi10S VW, OU=Dev, O=CarDeck, L=CN, ST=CN, C=CN"
+          printf "storeFile=%s/cardeck-mi10s.jks\nstorePassword=cardeck123\nkeyAlias=cardeck\nkeyPassword=cardeck123\n" "$GITHUB_WORKSPACE" > keystore.properties
 
       - name: Build Standard Debug & Release APKs
         run: |
