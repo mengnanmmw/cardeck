@@ -32,21 +32,22 @@ jobs:
               content = f.read_text(encoding="utf-8")
               orig = content
 
-              # 2. 大众车机 (VW/866/869/Desay/Preh/AQ CAR) 首选 20B MFi 挑战
+              # 2. 大众车机 (VW/866/869/Desay/Preh/AQ CAR) 首选 20B MFi 挑战（复用原接收者变量名）
               if "0xaa02" in content.lower() or "MfiLengthMemory" in content or "challenge" in content:
                   if "audi" in content.lower() and "desay" not in content.lower():
                       content = re.sub(
-                          r'(\.contains\(\s*"audi"\s*(?:,\s*ignoreCase\s*=\s*true)?\s*\))',
-                          r'\1 || name.contains("vw", ignoreCase = true) || name.contains("aq car", ignoreCase = true) || model.contains("866", ignoreCase = true) || model.contains("869", ignoreCase = true) || manufacturer.contains("desay", ignoreCase = true) || manufacturer.contains("preh", ignoreCase = true)',
+                          r'(\b[a-zA-Z0-9_.]+\b)\.contains\(\s*"audi"\s*((?:,\s*ignoreCase\s*=\s*true)?)\s*\)',
+                          r'(\1.contains("audi"\2) || \1.contains("vw"\2) || \1.contains("volkswagen"\2) || \1.contains("desay"\2) || \1.contains("preh"\2) || \1.contains("866"\2) || \1.contains("869"\2) || \1.contains("aq car"\2))',
                           content,
                           count=1
                       )
 
-              # 3. 清洗 0x4301 IP 字符串尾部 NUL 字节
+              # 3. 清洗 String(..., Charsets.UTF_8) 尾部 NUL 字节，防止大众 0x4301 IP 解析报错
               if ("0x4301" in content or "CarPlayStartSession" in content) and "trimEnd" not in content:
-                  content = content.replace(
-                      'Charsets.UTF_8)',
-                      'Charsets.UTF_8).trimEnd { it == \'\\u0000\' || it <= \' \' }'
+                  content = re.sub(
+                      r'(String\([^()\n]+,\s*Charsets\.UTF_8\))',
+                      r"\1.trimEnd { it == '\\u0000' || it <= ' ' }",
+                      content
                   )
 
               # 4. Android 13 虚拟屏强制横屏锁定
@@ -57,7 +58,7 @@ jobs:
                       content
                   )
 
-              # 5. 修复音频 EMSGSIZE、骁龙870 VBR 4.8Mbps 降热与大众 12寸屏 1.0x 原生像素对齐
+              # 5. 修复音频 EMSGSIZE、骁龙870 4.8Mbps 降热与大众 12寸屏 1.0x 原生像素对齐
               if f.name == "AudioSender.kt":
                   content = re.sub(r'\b(512|352)\b', '256', content, count=1)
               if f.name == "VideoSender.kt":
@@ -89,16 +90,15 @@ jobs:
             printf "storeFile=../cardeck-mi10s.jks\nstorePassword=cardeck123\nkeyAlias=cardeck\nkeyPassword=cardeck123\n" > keystore.properties
           fi
 
-      - name: Build Debug & Release APKs
+      - name: Build Standard Debug & Release APKs
         run: |
           chmod +x gradlew
           ./gradlew spotlessApply || true
-          ./gradlew :app:assembleDebug :app:assembleRelease -x lint -x lintDebug
+          ./gradlew :app:assembleStandardDebug :app:assembleStandardRelease
 
       - name: Upload Ready-to-Install APKs
         uses: actions/upload-artifact@v4
         with:
           name: CarDeck-Mi10S-Sagitar2026-APK
           path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/**/*.apk
