@@ -32,7 +32,7 @@ jobs:
               content = f.read_text(encoding="utf-8")
               orig = content
 
-              # 2. 大众车机 (VW/866/869/Desay/Preh/AQ CAR) 首选 20B MFi 挑战
+              # 2. 大众车机 (VW/866/869/Desay/Preh/AQ CAR) 识别扩展
               if "0xaa02" in content.lower() or "MfiLengthMemory" in content or "challenge" in content:
                   if "audi" in content.lower() and "desay" not in content.lower():
                       content = re.sub(
@@ -58,7 +58,29 @@ jobs:
                       content
                   )
 
-              # 5. 修复音频 EMSGSIZE、骁龙870 4.8Mbps 降热与大众 12寸屏 1.0x 原生像素对齐
+              # 5. 修复 cmd wifi connect-network 在带空格 SSID (如 "vwmeng 5 GHz") 下 exit=255 的问题
+              if "connect-network" in content:
+                  content = re.sub(
+                      r'cmd wifi connect-network\s+(\$[a-zA-Z0-9_]+|\$\{[^}]+\})\s+(\$[a-zA-Z0-9_]+|\$\{[^}]+\})\s+(\$[a-zA-Z0-9_]+|\$\{[^}]+\})',
+                      r"cmd wifi connect-network '\1' \2 '\3'",
+                      content
+                  )
+                  content = re.sub(
+                      r'cmd wifi connect-network\s+(\$[a-zA-Z0-9_]+|\$\{[^}]+\})\s+(wpa2|wpa3|open|owe)\s+(\$[a-zA-Z0-9_]+|\$\{[^}]+\})',
+                      r"cmd wifi connect-network '\1' \2 '\3'",
+                      content
+                  )
+
+              # 6. 修复蓝牙闪断重连时 getMediaProjection 抢跑前台服务声明的竞态报错
+              if "getMediaProjection(" in content and "MediaProjectionRaceGuard" not in content:
+                  content = re.sub(
+                      r'^([ \t]*)([^\n]*getMediaProjection\()',
+                      r'\1try { Thread.sleep(150) } catch (_: Throwable) {} // MediaProjectionRaceGuard\n\1\2',
+                      content,
+                      flags=re.MULTILINE
+                  )
+
+              # 7. 修复音频 EMSGSIZE、骁龙870 4.8Mbps 降热与大众 12寸屏 1.0x 原生像素对齐
               if f.name == "AudioSender.kt":
                   content = re.sub(r'\b(512|352)\b', '256', content, count=1)
               if f.name == "VideoSender.kt":
